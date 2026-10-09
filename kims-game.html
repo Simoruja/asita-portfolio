@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kim's Game</title>
+<meta name="description" content="Play Kim's game: study a tray of objects, then test your memory.">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #f7f4ee;
+  --bg2:     #ede9e0;
+  --card:    #ffffff;
+  --border:  rgba(40,30,10,0.12);
+  --navy:    #1c2233;
+  --gold:    #9a6f28;
+  --gold2:   #c49030;
+  --forest:  #2b5445;
+  --text:    #1e1a12;
+  --muted:   rgba(30,26,18,0.55);
+  --red:     #8b3a2a;
+  --good-bg: rgba(43,84,69,0.12);
+  --bad-bg:  rgba(139,58,42,0.12);
+  --sel-bg:  rgba(154,111,40,0.14);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141824; --bg2: #1c2233; --card: #232a3d; --border: rgba(255,240,210,0.12);
+    --navy: #f0e8d8; --gold: #e0b45a; --gold2: #e8c060; --forest: #6fbf9f;
+    --text: #f0ebe0; --muted: rgba(240,235,224,0.6); --red: #e08a76;
+    --good-bg: rgba(111,191,159,0.16); --bad-bg: rgba(224,138,118,0.16); --sel-bg: rgba(224,180,90,0.18);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141824; --bg2: #1c2233; --card: #232a3d; --border: rgba(255,240,210,0.12);
+  --navy: #f0e8d8; --gold: #e0b45a; --gold2: #e8c060; --forest: #6fbf9f;
+  --text: #f0ebe0; --muted: rgba(240,235,224,0.6); --red: #e08a76;
+  --good-bg: rgba(111,191,159,0.16); --bad-bg: rgba(224,138,118,0.16); --sel-bg: rgba(224,180,90,0.18);
+}
+
+*,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 300;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+.wrap { max-width: 920px; margin: 0 auto; padding: 32px 16px 64px; }
+
+header { text-align: center; margin-bottom: 28px; }
+.eyebrow { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); font-weight: 500; }
+h1 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: clamp(40px, 8vw, 64px); color: var(--navy); line-height: 1.05; margin: 6px 0 10px; }
+h1 em { color: var(--gold); font-style: italic; font-weight: 400; }
+.lead { color: var(--muted); max-width: 560px; margin: 0 auto; }
+
+.panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
+h2 { font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 28px; color: var(--navy); margin-bottom: 6px; }
+
+.settings { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 18px 0 24px; }
+.field label.title { display:block; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label { padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font-size: 14px; user-select: none; transition: background .15s, border-color .15s; }
+.seg input:checked + label { background: var(--navy); color: var(--bg); border-color: var(--navy); }
+.seg input:focus-visible + label { outline: 2px solid var(--gold2); outline-offset: 2px; }
+.hint { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+.btn { font: inherit; font-weight: 500; font-size: 15px; letter-spacing: .04em; padding: 12px 26px; border-radius: 999px; border: 1px solid var(--navy); background: var(--navy); color: var(--bg); cursor: pointer; transition: transform .1s, opacity .15s; }
+.btn:hover { transform: translateY(-1px); }
+.btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+.btn.ghost { background: transparent; color: var(--navy); }
+.btn:focus-visible { outline: 2px solid var(--gold2); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
+
+.hud { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: 14px; color: var(--muted); }
+.hud b { color: var(--text); font-weight: 500; }
+.phase { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: var(--navy); text-align: center; margin-bottom: 4px; }
+.instr { text-align: center; color: var(--muted); margin-bottom: 16px; min-height: 1.5em; }
+.instr:empty { display: none; }
+
+.timer { height: 6px; background: var(--bg2); border-radius: 99px; overflow: hidden; margin-bottom: 18px; }
+.timer > i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--gold), var(--gold2)); transform-origin: left; }
+
+.tray {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  background: var(--bg2); border-radius: 12px; padding: 14px;
+  min-height: 140px;
+}
+.tray.cover { position: relative; }
+.item {
+  font: inherit; color: var(--text);
+  background: var(--card); border: 2px solid transparent; border-radius: 10px;
+  padding: 12px 6px 10px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+  animation: pop .25s ease both;
+}
+.item .emo { font-size: 38px; line-height: 1.1; }
+.item .nm { font-size: 12px; color: var(--muted); }
+button.item { cursor: pointer; transition: border-color .12s, background .12s; }
+button.item:hover { border-color: var(--border); }
+button.item:focus-visible { outline: 2px solid var(--gold2); outline-offset: 2px; }
+.item.sel { border-color: var(--gold); background: var(--sel-bg); }
+.item.good { border-color: var(--forest); background: var(--good-bg); }
+.item.bad { border-color: var(--red); background: var(--bad-bg); }
+.item.missed { border-color: var(--forest); border-style: dashed; }
+.item .tag { font-size: 11px; font-weight: 500; letter-spacing: .04em; }
+.item.good .tag { color: var(--forest); }
+.item.bad .tag { color: var(--red); }
+.item.missed .tag { color: var(--forest); }
+.item.gone { visibility: hidden; }
+@keyframes pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+
+.blank { display: flex; align-items: center; justify-content: center; min-height: 220px; flex-direction: column; gap: 6px; }
+.blank .big { font-family: 'Cormorant Garamond', serif; font-size: 72px; color: var(--navy); line-height: 1; }
+
+.result { text-align: center; margin: 18px 0 4px; }
+.result .score { font-family: 'Cormorant Garamond', serif; font-size: 44px; font-weight: 700; color: var(--navy); }
+.result p { color: var(--muted); }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 18px; }
+.stat { background: var(--bg2); border-radius: 10px; padding: 12px; text-align: center; }
+.stat .v { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 700; color: var(--navy); }
+.stat .k { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+
+.rules { margin-top: 22px; font-size: 14px; color: var(--muted); }
+.rules summary { cursor: pointer; color: var(--gold); font-weight: 500; }
+.rules ol { padding-left: 20px; margin-top: 8px; display: grid; gap: 4px; }
+
+footer { text-align: center; margin-top: 30px; font-size: 13px; color: var(--muted); }
+footer a { color: var(--gold); }
+
+[hidden] { display: none !important; }
+
+@media (max-width: 480px) {
+  .panel { padding: 16px; }
+  .tray { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; padding: 10px; }
+  .item .emo { font-size: 30px; }
+}
+@media (prefers-reduced-motion: reduce) { .item { animation: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">A memory game</div>
+    <h1>Kim's <em>Game</em></h1>
+    <p class="lead">Study the tray of objects before the time runs out. When it's hidden, see how much you can remember.</p>
+  </header>
+
+  <!-- SETUP -->
+  <section class="panel" id="setup">
+    <h2>Set up a game</h2>
+    <div class="settings">
+      <div class="field">
+        <label class="title">Mode</label>
+        <div class="seg" id="modeSeg">
+          <input type="radio" name="mode" id="m-missing" value="missing" checked><label for="m-missing">What's missing?</label>
+          <input type="radio" name="mode" id="m-recall" value="recall"><label for="m-recall">Recall the tray</label>
+        </div>
+        <p class="hint" id="modeHint"></p>
+      </div>
+      <div class="field">
+        <label class="title">Difficulty</label>
+        <div class="seg" id="diffSeg">
+          <input type="radio" name="diff" id="d-easy" value="easy" checked><label for="d-easy">Easy</label>
+          <input type="radio" name="diff" id="d-med" value="medium"><label for="d-med">Medium</label>
+          <input type="radio" name="diff" id="d-hard" value="hard"><label for="d-hard">Hard</label>
+        </div>
+        <p class="hint" id="diffHint"></p>
+      </div>
+      <div class="field">
+        <label class="title">Rounds</label>
+        <div class="seg">
+          <input type="radio" name="rounds" id="r3" value="3"><label for="r3">3</label>
+          <input type="radio" name="rounds" id="r5" value="5" checked><label for="r5">5</label>
+          <input type="radio" name="rounds" id="r10" value="10"><label for="r10">10</label>
+        </div>
+      </div>
+    </div>
+    <div class="actions"><button class="btn" id="startBtn">Start game</button></div>
+
+    <details class="rules">
+      <summary>How to play</summary>
+      <ol>
+        <li>A tray of objects appears. Memorise as many as you can before the timer runs out.</li>
+        <li>The tray is covered for a moment.</li>
+        <li><b>What's missing?</b> The tray comes back with some objects removed. Pick the missing ones from the choices below it.</li>
+        <li><b>Recall the tray:</b> You see a larger mix of objects. Pick every one that was on the tray.</li>
+        <li>Each correct pick earns a point and each wrong pick loses one. A round never scores below zero.</li>
+      </ol>
+      <p style="margin-top:8px">Kim's game gets its name from Rudyard Kipling's novel <i>Kim</i> (1901), in which the young hero is trained to observe this way. Scouts and guides still play it today.</p>
+    </details>
+  </section>
+
+  <!-- PLAY -->
+  <section class="panel" id="play" hidden>
+    <div class="hud">
+      <span>Round <b id="hudRound">1</b> / <b id="hudRounds">5</b></span>
+      <span id="hudMode"></span>
+      <span>Score <b id="hudScore">0</b></span>
+    </div>
+    <div class="phase" id="phase">Memorise</div>
+    <p class="instr" id="instr" aria-live="polite"></p>
+    <div class="timer" id="timer"><i id="timerBar"></i></div>
+
+    <div id="trayWrap"></div>
+
+    <div id="choicesWrap" hidden>
+      <p class="instr" style="margin:18px 0 10px" id="choicesLabel">Which objects are missing?</p>
+      <div class="tray" id="choices"></div>
+    </div>
+
+    <div class="result" id="roundResult" hidden></div>
+
+    <div class="actions">
+      <button class="btn ghost" id="skipBtn">I'm ready</button>
+      <button class="btn" id="submitBtn" hidden disabled>Check answer</button>
+      <button class="btn" id="nextBtn" hidden>Next round</button>
+      <button class="btn ghost" id="quitBtn">Quit</button>
+    </div>
+  </section>
+
+  <!-- SUMMARY -->
+  <section class="panel" id="summary" hidden>
+    <h2 style="text-align:center">Game over</h2>
+    <div class="result">
+      <div class="score" id="finalScore">0</div>
+      <p id="finalMsg"></p>
+    </div>
+    <div class="stats" id="finalStats"></div>
+    <div class="actions">
+      <button class="btn" id="againBtn">Play again</button>
+      <button class="btn ghost" id="setupBtn">Change settings</button>
+    </div>
+  </section>
+
+  <footer><a href="index.html">← Back to portfolio</a></footer>
+</div>
+
+<script>
+(() => {
+  const ITEMS = [
+    ['🔑','Key'],['⌚','Watch'],['📎','Paper clip'],['✏️','Pencil'],['🪙','Coin'],['🕯️','Candle'],
+    ['🧭','Compass'],['🔦','Torch'],['🧵','Thread'],['🪡','Needle'],['🧷','Safety pin'],['✂️','Scissors'],
+    ['📏','Ruler'],['🔋','Battery'],['💡','Light bulb'],['🔍','Magnifier'],['📌','Pin'],['🖊️','Pen'],
+    ['🎲','Die'],['🧩','Puzzle piece'],['🪀','Yo-yo'],['🎈','Balloon'],['🧸','Teddy bear'],['🪁','Kite'],
+    ['🍎','Apple'],['🍋','Lemon'],['🥕','Carrot'],['🍌','Banana'],['🧀','Cheese'],['🥚','Egg'],
+    ['🍄','Mushroom'],['🌰','Chestnut'],['🐚','Shell'],['🪶','Feather'],['🍂','Leaf'],['🌸','Flower'],
+    ['🪨','Stone'],['🦴','Bone'],['🥄','Spoon'],['🍴','Fork'],['☕','Cup'],['🧂','Salt'],
+    ['🔔','Bell'],['📮','Postbox'],['✉️','Envelope'],['📚','Books'],['🗝️','Old key'],['🧲','Magnet'],
+    ['🪥','Toothbrush'],['🧼','Soap'],['🧽','Sponge'],['🪒','Razor'],['👓','Glasses'],['🧤','Gloves'],
+    ['🧦','Socks'],['🎩','Top hat'],['👒','Sun hat'],['🧣','Scarf'],['💍','Ring'],['🎀','Ribbon'],
+    ['⚽','Football'],['🏀','Basketball'],['🎾','Tennis ball'],['🏓','Bat'],['🎯','Dart board'],['🪃','Boomerang'],
+    ['⏰','Alarm clock'],['📷','Camera'],['📱','Phone'],['🎧','Headphones'],['🧯','Extinguisher'],['🪜','Ladder'],
+    ['🔨','Hammer'],['🪛','Screwdriver'],['🔧','Spanner'],['🪚','Saw'],['🧰','Toolbox'],['🪣','Bucket'],
+  ].map(([emo, name], id) => ({ id, emo, name }));
+
+  // shown: objects on the tray; study: seconds; missing: objects removed (missing mode);
+  // pool: total choices in recall mode
+  const LEVELS = {
+    easy:   { shown: 8,  study: 20, missing: 1, pool: 14 },
+    medium: { shown: 12, study: 25, missing: 2, pool: 20 },
+    hard:   { shown: 16, study: 30, missing: 3, pool: 28 },
+  };
+  const COVER_MS = 1800;
+
+  const $ = id => document.getElementById(id);
+  const sections = { setup: $('setup'), play: $('play'), summary: $('summary') };
+  const show = name => Object.entries(sections).forEach(([k, el]) => el.hidden = k !== name);
+
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const radio = name => document.querySelector(`input[name="${name}"]:checked`).value;
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+
+  let game = null, timerRaf = 0, coverTimeout = 0;
+
+  function updateHints() {
+    const lvl = LEVELS[radio('diff')];
+    $('diffHint').textContent = `${lvl.shown} objects, ${lvl.study} seconds to study.`;
+    $('modeHint').textContent = radio('mode') === 'missing'
+      ? `Spot the ${lvl.missing === 1 ? 'object' : lvl.missing + ' objects'} taken off the tray.`
+      : `Pick out all ${lvl.shown} objects from a mix of ${lvl.pool}.`;
+  }
+  document.querySelectorAll('#setup input').forEach(i => i.addEventListener('change', updateHints));
+
+  // restore last settings
+  const saved = store.get('kims-settings');
+  if (saved) for (const [k, v] of Object.entries(saved)) {
+    const el = document.querySelector(`input[name="${k}"][value="${v}"]`);
+    if (el) el.checked = true;
+  }
+  updateHints();
+
+  function itemEl(it, { button = false, tag = '' } = {}) {
+    const el = document.createElement(button ? 'button' : 'div');
+    el.className = 'item';
+    if (button) { el.type = 'button'; el.setAttribute('aria-pressed', 'false'); }
+    el.innerHTML = `<span class="emo" aria-hidden="true">${it.emo}</span><span class="nm">${it.name}</span>${tag ? `<span class="tag">${tag}</span>` : ''}`;
+    el.dataset.id = it.id;
+    return el;
+  }
+
+  function startGame() {
+    const settings = { mode: radio('mode'), diff: radio('diff'), rounds: radio('rounds') };
+    store.set('kims-settings', settings);
+    game = { ...settings, rounds: +settings.rounds, lvl: LEVELS[settings.diff], round: 0, score: 0, correct: 0, wrong: 0, possible: 0, perfect: 0 };
+    $('hudRounds').textContent = game.rounds;
+    $('hudMode').textContent = (game.mode === 'missing' ? "What's missing?" : 'Recall') + ' · ' + game.diff[0].toUpperCase() + game.diff.slice(1);
+    show('play');
+    nextRound();
+  }
+
+  function nextRound() {
+    game.round++;
+    $('hudRound').textContent = game.round;
+    $('hudScore').textContent = game.score;
+    const { shown } = game.lvl;
+    const tray = shuffle(ITEMS).slice(0, shown);
+    game.tray = tray;
+    game.picked = new Set();
+
+    $('roundResult').hidden = true;
+    $('choicesWrap').hidden = true;
+    $('nextBtn').hidden = true;
+    $('submitBtn').hidden = true;
+    $('skipBtn').hidden = false;
+    $('timer').hidden = false;
+    $('phase').textContent = 'Memorise';
+    $('instr').textContent = 'Study the tray carefully.';
+
+    const grid = document.createElement('div');
+    grid.className = 'tray';
+    tray.forEach(it => grid.appendChild(itemEl(it)));
+    $('trayWrap').replaceChildren(grid);
+
+    runTimer(game.lvl.study * 1000, coverTray);
+  }
+
+  function runTimer(ms, done) {
+    cancelAnimationFrame(timerRaf);
+    const bar = $('timerBar'), t0 = performance.now();
+    const tick = now => {
+      const f = Math.max(0, 1 - (now - t0) / ms);
+      bar.style.transform = `scaleX(${f})`;
+      const secs = Math.ceil(f * ms / 1000);
+      $('instr').textContent = `Study the tray carefully. ${secs}s left`;
+      if (f > 0) timerRaf = requestAnimationFrame(tick); else done();
+    };
+    timerRaf = requestAnimationFrame(tick);
+  }
+
+  function coverTray() {
+    cancelAnimationFrame(timerRaf);
+    $('skipBtn').hidden = true;
+    $('timer').hidden = true;
+    $('phase').textContent = 'Covered';
+    $('instr').textContent = 'The tray is covered…';
+    const blank = document.createElement('div');
+    blank.className = 'tray blank';
+    blank.innerHTML = '<div class="big">?</div>';
+    $('trayWrap').replaceChildren(blank);
+    coverTimeout = setTimeout(game.mode === 'missing' ? askMissing : askRecall, COVER_MS);
+  }
+
+  function askMissing() {
+    const { missing } = game.lvl;
+    const removed = shuffle(game.tray).slice(0, missing);
+    game.answer = new Set(removed.map(i => i.id));
+    game.need = missing;
+
+    $('phase').textContent = "What's missing?";
+    $('instr').textContent = `${missing === 1 ? 'One object has' : missing + ' objects have'} been taken away.`;
+
+    const grid = document.createElement('div');
+    grid.className = 'tray';
+    shuffle(game.tray).forEach(it => {
+      if (!game.answer.has(it.id)) grid.appendChild(itemEl(it));
+    });
+    $('trayWrap').replaceChildren(grid);
+
+    // choices: the removed objects plus decoys that were never on the tray
+    const onTray = new Set(game.tray.map(i => i.id));
+    const decoys = shuffle(ITEMS.filter(i => !onTray.has(i.id))).slice(0, Math.max(5, missing * 3));
+    $('choicesLabel').textContent = `Pick the ${missing === 1 ? 'missing object' : missing + ' missing objects'}:`;
+    renderChoices(shuffle([...removed, ...decoys]));
+  }
+
+  function askRecall() {
+    const { pool } = game.lvl;
+    game.answer = new Set(game.tray.map(i => i.id));
+    game.need = game.tray.length;
+    const decoys = shuffle(ITEMS.filter(i => !game.answer.has(i.id))).slice(0, pool - game.tray.length);
+
+    $('phase').textContent = 'Recall the tray';
+    $('instr').textContent = `Pick all ${game.tray.length} objects that were on the tray.`;
+    $('trayWrap').replaceChildren();
+    $('choicesLabel').textContent = '';
+    renderChoices(shuffle([...game.tray, ...decoys]));
+  }
+
+  function renderChoices(list) {
+    const grid = $('choices');
+    grid.replaceChildren();
+    list.forEach(it => {
+      const b = itemEl(it, { button: true });
+      b.addEventListener('click', () => togglePick(b, it.id));
+      grid.appendChild(b);
+    });
+    $('choicesWrap').hidden = false;
+    $('submitBtn').hidden = false;
+    updateSubmit();
+  }
+
+  function togglePick(el, id) {
+    if (game.checked) return;
+    if (game.picked.has(id)) game.picked.delete(id);
+    else {
+      if (game.picked.size >= game.need) return; // can't pick more than the answer size
+      game.picked.add(id);
+    }
+    el.classList.toggle('sel', game.picked.has(id));
+    el.setAttribute('aria-pressed', game.picked.has(id));
+    updateSubmit();
+  }
+
+  function updateSubmit() {
+    game.checked = false;
+    const n = game.picked.size;
+    $('submitBtn').disabled = n === 0;
+    $('submitBtn').textContent = `Check answer (${n}/${game.need})`;
+  }
+
+  function checkAnswer() {
+    game.checked = true;
+    let correct = 0, wrong = 0;
+    $('choices').querySelectorAll('.item').forEach(el => {
+      const id = +el.dataset.id, picked = game.picked.has(id), right = game.answer.has(id);
+      el.classList.remove('sel');
+      el.disabled = true;
+      let tag = '';
+      if (picked && right) { el.classList.add('good'); tag = '✓ Correct'; correct++; }
+      else if (picked && !right) { el.classList.add('bad'); tag = '✗ Not there'; wrong++; }
+      else if (!picked && right) { el.classList.add('missed'); tag = 'Missed'; }
+      if (tag) el.insertAdjacentHTML('beforeend', `<span class="tag">${tag}</span>`);
+    });
+
+    const pts = Math.max(0, correct - wrong);
+    game.score += pts; game.correct += correct; game.wrong += wrong; game.possible += game.need;
+    if (correct === game.need && wrong === 0) game.perfect++;
+    $('hudScore').textContent = game.score;
+
+    // in missing mode, show the full original tray again for reference
+    if (game.mode === 'missing') {
+      const grid = document.createElement('div');
+      grid.className = 'tray';
+      game.tray.forEach(it => {
+        const el = itemEl(it, { tag: game.answer.has(it.id) ? 'Was missing' : '' });
+        if (game.answer.has(it.id)) el.classList.add('missed');
+        grid.appendChild(el);
+      });
+      $('trayWrap').replaceChildren(grid);
+    }
+
+    const perfect = correct === game.need && wrong === 0;
+    $('phase').textContent = perfect ? 'Perfect!' : correct > 0 ? 'Good effort' : 'Not this time';
+    $('instr').textContent = '';
+    const r = $('roundResult');
+    r.innerHTML = `<p>${correct} of ${game.need} correct${wrong ? `, ${wrong} wrong` : ''}. <b>+${pts}</b> point${pts === 1 ? '' : 's'}.</p>`;
+    r.hidden = false;
+    $('submitBtn').hidden = true;
+    $('nextBtn').hidden = false;
+    $('nextBtn').textContent = game.round >= game.rounds ? 'See results' : 'Next round';
+    $('nextBtn').focus();
+  }
+
+  function finish() {
+    const key = `kims-best-${game.mode}-${game.diff}-${game.rounds}`;
+    const best = store.get(key) || 0;
+    const newBest = game.score > best;
+    if (newBest) store.set(key, game.score);
+    const acc = game.possible ? Math.round(100 * game.correct / game.possible) : 0;
+
+    $('finalScore').textContent = `${game.score} / ${game.possible}`;
+    $('finalMsg').textContent = newBest && best > 0 ? 'New personal best!'
+      : acc >= 90 ? 'An eye like Kim himself.'
+      : acc >= 60 ? 'Sharp observation. Try a harder level?'
+      : 'Keep practising. Your memory will sharpen.';
+    $('finalStats').innerHTML = [
+      ['Accuracy', acc + '%'],
+      ['Perfect rounds', `${game.perfect}/${game.rounds}`],
+      ['Wrong picks', game.wrong],
+      ['Best score', Math.max(best, game.score)],
+    ].map(([k, v]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+    show('summary');
+  }
+
+  function quit() {
+    cancelAnimationFrame(timerRaf);
+    clearTimeout(coverTimeout);
+    game = null;
+    show('setup');
+  }
+
+  $('startBtn').addEventListener('click', startGame);
+  $('skipBtn').addEventListener('click', coverTray);
+  $('submitBtn').addEventListener('click', checkAnswer);
+  $('nextBtn').addEventListener('click', () => game.round >= game.rounds ? finish() : nextRound());
+  $('quitBtn').addEventListener('click', quit);
+  $('againBtn').addEventListener('click', startGame);
+  $('setupBtn').addEventListener('click', () => show('setup'));
+})();
+</script>
+</body>
+</html>
