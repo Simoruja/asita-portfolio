@@ -1,7 +1,7 @@
 {
-  "name": "Kim's Game",
-  "short_name": "Kim's Game",
-  "description": "Study a tray of objects, then test your memory.",
+  "name": "Asita's Game",
+  "short_name": "Asita's Game",
+  "description": "A rendition of Kim's game: study a tray of objects, then test your memory.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f7f4ee",

@@ -79,7 +79,28 @@
     hard:   { shown: 16, study: 30, missing: 3, pool: 28 },
   };
   const COVER_MS = 1800;
-  const decoyCount = (mode, lvl) => mode === 'missing' ? Math.max(5, lvl.missing * 3) : lvl.pool - lvl.shown;
+  // choices that were never on the tray: capped so a big custom game still fits on a phone screen
+  const decoyCount = (mode, lvl) => mode === 'missing' ? Math.min(24, Math.max(5, lvl.missing * 3)) : lvl.pool - lvl.shown;
+
+  // Custom game: the player sets rounds, objects to guess, tray size and study time.
+  // In "What's missing?" the objects to guess are the ones taken off the tray;
+  // in "Recall" they are the whole tray.
+  const CUSTOM_RANGE = {
+    rounds: [1, 30],
+    shown:  [2, 30],
+    study:  [5, 120],
+    guess:  { missing: [1, 29], recall: [1, 30] },
+  };
+  const snap5 = s => 5 * Math.round(s / 5);
+  const autoStudy = shown => Math.min(120, Math.max(5, 5 * Math.round((10 + shown * 1.25) / 5)));
+  const recallPool = shown => shown + Math.max(4, Math.round(shown * 0.75));
+  const custom = {
+    rounds: 5,
+    missing: { shown: 12, guess: 2, study: autoStudy(12), studyTouched: false },
+    recall:  { guess: 10, study: autoStudy(10), studyTouched: false },
+  };
+  const customTray = mode => mode === 'missing' ? custom.missing.shown : custom.recall.guess;
+  const customRange = (field, mode) => field === 'guess' ? CUSTOM_RANGE.guess[mode] : CUSTOM_RANGE[field];
 
   /* ───────────── Helpers ───────────── */
 
@@ -152,34 +173,131 @@
   const saved = store.get('kims-settings');
   if (saved) {
     for (const k of ['mode', 'diff', 'rounds']) {
-      const el = document.querySelector(`input[name="${k}"][value="${saved[k]}"]`);
+      const el = [...document.querySelectorAll(`input[name="${k}"]`)].find(i => i.value === String(saved[k]));
       if (el) el.checked = true;
     }
     if (Array.isArray(saved.cats) && saved.cats.length) {
       document.querySelectorAll('input[name="cat"]').forEach(i => i.checked = saved.cats.includes(i.value));
     }
+    const sc = saved.custom;
+    if (sc && typeof sc === 'object') {
+      const num = (v, [lo, hi], fallback) => typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : fallback;
+      const sm = sc.missing || {}, sr = sc.recall || {};
+      custom.rounds = num(sc.rounds, CUSTOM_RANGE.rounds, custom.rounds);
+      const m = custom.missing;
+      m.shown = num(sm.shown, CUSTOM_RANGE.shown, m.shown);
+      m.guess = num(sm.guess, [1, m.shown - 1], Math.min(m.guess, m.shown - 1));
+      m.studyTouched = sm.studyTouched === true;
+      m.study = m.studyTouched ? snap5(num(sm.study, CUSTOM_RANGE.study, autoStudy(m.shown))) : autoStudy(m.shown);
+      const r = custom.recall;
+      r.guess = num(sr.guess, CUSTOM_RANGE.guess.recall, r.guess);
+      r.studyTouched = sr.studyTouched === true;
+      r.study = r.studyTouched ? snap5(num(sr.study, CUSTOM_RANGE.study, autoStudy(r.guess))) : autoStudy(r.guess);
+    }
+  }
+
+  // Settings for the game as currently chosen on the setup screen.
+  function currentSetup() {
+    const mode = radio('mode'), diff = radio('diff'), cats = checkedCats();
+    if (diff !== 'custom') return { mode, diff, cats, rounds: +radio('rounds'), lvl: LEVELS[diff] };
+    const c = custom[mode], shown = customTray(mode);
+    const lvl = mode === 'missing'
+      ? { shown, study: c.study, missing: c.guess, pool: 0 }
+      : { shown, study: c.study, missing: 0, pool: recallPool(shown) };
+    return { mode, diff, cats, rounds: custom.rounds, lvl };
+  }
+
+  // Applies a change to one custom setting, keeping every value in range and consistent with the others.
+  function setCustom(field, raw) {
+    const mode = radio('mode'), c = custom[mode];
+    const [lo, hi] = customRange(field, mode);
+    const prev = field === 'rounds' ? custom.rounds : field === 'shown' ? custom.missing.shown : c[field];
+    const n = String(raw).trim() === '' ? NaN : Number(raw);
+    const v = Number.isFinite(n) ? Math.min(hi, Math.max(lo, field === 'study' ? snap5(n) : Math.round(n))) : prev;
+
+    if (field === 'rounds') custom.rounds = v;
+    else if (field === 'shown') {
+      custom.missing.shown = v;
+      if (custom.missing.guess >= v) custom.missing.guess = v - 1;
+    } else if (field === 'guess') {
+      c.guess = v;
+      if (mode === 'missing' && custom.missing.shown <= v) custom.missing.shown = v + 1;
+    } else if (field === 'study') {
+      c.study = v;
+      if (Number.isFinite(n)) c.studyTouched = true;
+    }
+    if (!c.studyTouched) c.study = autoStudy(customTray(mode));
+    renderCustom();
+    updateSetup();
+  }
+
+  function renderCustom() {
+    const mode = radio('mode'), c = custom[mode];
+    const values = { rounds: custom.rounds, guess: c.guess, shown: custom.missing.shown, study: c.study };
+    for (const [field, v] of Object.entries(values)) {
+      const input = $('c-' + field), [lo, hi] = customRange(field, mode);
+      input.value = v;
+      input.min = lo;
+      input.max = hi;
+    }
+    $('c-shown-wrap').hidden = mode !== 'missing';
+    document.querySelectorAll('#customField .step').forEach(b => {
+      const field = b.dataset.for.slice(2), [lo, hi] = customRange(field, mode), v = values[field];
+      // in missing mode "objects to guess" can't reach the tray size, and the tray can't exceed 30
+      const top = field === 'guess' && mode === 'missing' ? Math.min(hi, CUSTOM_RANGE.shown[1] - 1) : hi;
+      const off = +b.dataset.step < 0 ? v <= lo : v >= top;
+      // a focused button that becomes disabled would drop focus to <body>; hand it to the opposite button
+      if (off && document.activeElement === b) b.parentElement.querySelector(`.step[data-step="${-b.dataset.step}"]`).focus();
+      b.disabled = off;
+    });
   }
 
   function updateSetup() {
-    const mode = radio('mode'), lvl = LEVELS[radio('diff')], rounds = +radio('rounds'), cats = checkedCats();
-    $('diffHint').textContent = `${lvl.shown} objects, ${lvl.study} seconds to study.`;
+    const { mode, diff, cats, rounds, lvl } = currentSetup();
+    const isCustom = diff === 'custom';
+    $('customField').hidden = !isCustom;
+    $('roundsField').hidden = isCustom;
+    $('diffHint').textContent = isCustom
+      ? 'Choose your own rounds, objects and study time.'
+      : `${lvl.shown} objects, ${lvl.study} seconds to study.`;
     $('modeHint').textContent = mode === 'missing'
-      ? `Spot the ${lvl.missing === 1 ? 'object' : lvl.missing + ' objects'} taken off the tray.`
-      : `Pick out all ${lvl.shown} objects from a mix of ${lvl.pool}.`;
+      ? `Spot the ${lvl.missing === 1 ? 'object' : lvl.missing + ' objects'} taken off ${isCustom ? `a tray of ${lvl.shown}` : 'the tray'}.`
+      : lvl.shown === 1 ? `Pick out the 1 object from a mix of ${lvl.pool}.` : `Pick out all ${lvl.shown} objects from a mix of ${lvl.pool}.`;
 
+    // Every round needs a fresh tray; the last round also needs decoys that were never on a tray.
     const available = CATALOGUE.filter(it => cats.includes(it.cat)).length;
-    const needed = rounds * lvl.shown + decoyCount(mode, lvl);
+    const maxRounds = Math.max(0, Math.floor((available - decoyCount(mode, lvl)) / lvl.shown));
     const hint = $('catHint');
     let ok = true;
     if (!cats.length) { hint.textContent = 'Choose at least one kind of object.'; ok = false; }
-    else if (available < needed) {
-      hint.textContent = `Not enough different objects for ${rounds} rounds without repeats. Add another kind or play fewer rounds.`;
+    else if (maxRounds < 1) {
+      hint.textContent = `Not enough different objects for a tray of ${lvl.shown} plus ${decoyCount(mode, lvl)} other choices. ` +
+        (isCustom ? 'Add another kind of object, or use fewer objects to guess or a smaller tray.' : 'Add another kind of object or choose an easier difficulty.');
+      ok = false;
+    } else if (rounds > maxRounds) {
+      const tip = isCustom || maxRounds >= 3 ? 'play fewer rounds' : `choose Custom to play ${plural(maxRounds, 'round')}`;
+      hint.textContent = `Not enough different objects for ${rounds} rounds without repeats (${maxRounds} at most with these settings). Add another kind of object or ${tip}.`;
       ok = false;
     } else hint.textContent = `${available} different objects. None will appear on the tray twice in a game.`;
     hint.classList.toggle('warn', !ok);
+
+    if (isCustom) {
+      const guess = mode === 'missing' ? lvl.missing : lvl.shown;
+      const summary = `${plural(rounds, 'round')} · ${plural(guess, 'object')} to guess` +
+        (mode === 'missing' ? ` from a tray of ${lvl.shown}` : '') + ` · ${lvl.study} seconds to study.`;
+      $('customHint').textContent = ok ? summary : `${summary} ${hint.textContent}`;
+      $('customHint').classList.toggle('warn', !ok);
+    }
     $('startBtn').disabled = !ok;
   }
-  document.querySelectorAll('#setup input').forEach(i => i.addEventListener('change', updateSetup));
+
+  document.querySelectorAll('#setup input[type="radio"], #setup input[type="checkbox"]').forEach(i =>
+    i.addEventListener('change', () => { renderCustom(); updateSetup(); }));
+  document.querySelectorAll('#customField .step').forEach(b =>
+    b.addEventListener('click', () => setCustom(b.dataset.for.slice(2), +$(b.dataset.for).value + +b.dataset.step)));
+  ['rounds', 'guess', 'shown', 'study'].forEach(field =>
+    $('c-' + field).addEventListener('change', e => setCustom(field, e.target.value)));
+  renderCustom();
   updateSetup();
 
   /* ───────────── Game flow ───────────── */
@@ -189,10 +307,10 @@
   let coverTimeout = 0;
 
   function startGame() {
-    const settings = { mode: radio('mode'), diff: radio('diff'), rounds: radio('rounds'), cats: checkedCats() };
-    store.set('kims-settings', settings);
+    const s = currentSetup();
+    store.set('kims-settings', { mode: s.mode, diff: s.diff, rounds: radio('rounds'), cats: s.cats, custom });
     game = {
-      ...settings, rounds: +settings.rounds, lvl: LEVELS[settings.diff],
+      mode: s.mode, diff: s.diff, cats: s.cats, rounds: s.rounds, lvl: { ...s.lvl },
       round: 0, score: 0, history: [],
       onTray: new Set(), // keys that have been on a tray: never shown on a tray again
       seen: new Set(),   // keys shown in any way (tray or decoy)
@@ -210,6 +328,7 @@
   }
 
   function nextRound() {
+    $('play').scrollIntoView({ block: 'start' });
     game.round++;
     $('hudRound').textContent = game.round;
     $('hudScore').textContent = game.score;
@@ -252,6 +371,7 @@
 
   function coverTray() {
     stopTimer();
+    $('play').scrollIntoView({ block: 'start' });
     setButtons({});
     $('timer').hidden = true;
     $('phase').textContent = 'Covered';
@@ -285,7 +405,7 @@
     $('phase').textContent = 'Recall the tray';
     $('instr').textContent = '';
     $('trayWrap').replaceChildren();
-    $('choicesLabel').textContent = `Pick all ${game.need} objects that were on the tray:`;
+    $('choicesLabel').textContent = game.need === 1 ? 'Pick the object that was on the tray:' : `Pick all ${game.need} objects that were on the tray:`;
     renderChoices(shuffle([...game.tray, ...decoys]));
   }
 
@@ -401,7 +521,8 @@
     const possible = sum('need'), correct = sum('correct'), wrong = sum('wrong'), missed = sum('missed');
     const perfectRounds = h.filter(r => r.correct === r.need && !r.wrong).length;
 
-    const key = `kims-best-${game.mode}-${game.diff}-${game.rounds}-${[...game.cats].sort().join('')}`;
+    const level = game.diff === 'custom' ? `custom${game.lvl.shown}x${game.lvl.missing}x${game.lvl.study}` : game.diff;
+    const key = `kims-best-${game.mode}-${level}-${game.rounds}-${[...game.cats].sort().join('')}`;
     const best = store.get(key) || 0;
     const newBest = game.score > best;
     if (newBest) store.set(key, game.score);

@@ -72,6 +72,29 @@ fieldset { border: 0; min-width: 0; }
 .seg input:checked + label { background: var(--navy); color: var(--on-navy); border-color: var(--navy); }
 .seg input:focus-visible + label { outline: 2px solid var(--gold2); outline-offset: 2px; }
 .hint { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+/* Custom game controls */
+.field.custom { grid-column: 1 / -1; background: var(--bg2); border-radius: 12px; padding: 14px 16px 16px; }
+.field.custom .title { float: left; width: 100%; } /* keeps the legend inside the padded box */
+.steppers { clear: both; display: grid; gap: 12px 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); }
+.stepper > label { display: block; font-size: 14px; font-weight: 400; margin-bottom: 6px; }
+.stepper-ctl { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 999px; background: var(--card); overflow: hidden; }
+.stepper-ctl .step {
+  font: inherit; font-size: 22px; line-height: 1; width: 48px; height: 46px;
+  border: 0; background: transparent; color: var(--navy); cursor: pointer;
+}
+.stepper-ctl .step:disabled { opacity: .3; cursor: not-allowed; }
+.stepper-ctl .step:first-child { border-radius: 999px 0 0 999px; }
+.stepper-ctl .step:last-child { border-radius: 0 999px 999px 0; }
+.stepper-ctl .step:focus-visible, .stepper-ctl input:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+@media (hover: hover) { .stepper-ctl .step:not(:disabled):hover { background: var(--sel-bg); } }
+.stepper-ctl input {
+  /* 16px stops iOS Safari zooming in when the field is focused */
+  font: inherit; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
+  width: 56px; height: 46px; text-align: center; border: 0; border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+  background: transparent; color: var(--text); -moz-appearance: textfield; appearance: textfield;
+}
+.stepper-ctl input::-webkit-outer-spin-button, .stepper-ctl input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .hint.warn { color: var(--red); }
 
 .btn { font: inherit; font-weight: 500; font-size: 16px; letter-spacing: .02em; min-height: 48px; padding: 12px 26px; border-radius: 999px; border: 1px solid var(--navy); background: var(--navy); color: var(--on-navy); cursor: pointer; transition: transform .1s, opacity .15s; }
@@ -198,6 +221,8 @@ table.rounds { width: 100%; border-collapse: collapse; font-size: 14px; }
   .sc-sec .item { min-height: 78px; }
   .btn { padding: 12px 20px; }
   .actions.sticky .btn { flex: 1 1 auto; }
+  .rounds th, .rounds td { padding: 9px 3px; }
+  .rounds th { letter-spacing: 0; }
 }
 /* Very narrow phones (e.g. iPhone SE) */
 @media (max-width: 360px) {
