@@ -72,7 +72,7 @@
         <p class="hint" id="catHint"></p>
       </fieldset>
     </div>
-    <div class="actions"><button class="btn" id="startBtn" type="button">Deal the cards</button></div>
+    <div class="actions"><button class="btn" id="startBtn" type="button" aria-describedby="catHint">Deal the cards</button></div>
     <p class="best-line" id="bestLine"></p>
 
     <details class="rules">
@@ -83,7 +83,8 @@
         <li>Tap a card to turn it over, then tap a second card. If the two match, they stay face up. If not, they turn back over, so try to remember where they were.</li>
         <li>The timer starts on your first tap and stops when you find the last pair. Each try at a pair counts as one move.</li>
         <li>You can pause at any time. The board is hidden while the game is paused.</li>
-        <li>Each round deals new objects, and your best time for every board size is saved on this device.</li>
+        <li>On a keyboard, use the arrow keys to move between cards, Enter or Space to turn one over and Esc to pause.</li>
+        <li>Each round deals objects you didn't have in the last round, where there are enough to choose from. Your best time for every board size is saved on this device.</li>
       </ol>
     </details>
   </section>
@@ -113,20 +114,21 @@
 
   <!-- RESULTS -->
   <section class="panel" id="results" hidden>
-    <h2 class="center" id="resultTitle">Table cleared!</h2>
+    <h2 class="center" id="resultTitle" tabindex="-1">Table cleared!</h2>
     <div class="final">
       <div class="score mono" id="finalTime">0:00.0</div>
       <p id="finalMsg"></p>
     </div>
     <div class="stats" id="finalStats"></div>
-    <h3 class="sub">Your rounds</h3>
-    <div class="table-wrap"><table class="rounds" id="roundsTable"></table></div>
     <div class="actions">
       <button class="btn" id="againBtn" type="button">Play again</button>
       <button class="btn ghost" id="setupBtn" type="button">Change board</button>
     </div>
+    <h3 class="sub">Your rounds</h3>
+    <div class="table-wrap"><table class="rounds" id="roundsTable"></table></div>
   </section>
 </div>
+<div class="sr-only" id="announcer" aria-live="polite"></div>
 <script src="game.js"></script>
 </body>
 </html>

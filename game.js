@@ -5,25 +5,26 @@
      Every object has a unique key, a category, a readable name and a visual. */
 
   const EMOJI = [
-    ['🔑','Key'],['⌚','Watch'],['📎','Paper clip'],['✏️','Pencil'],['🪙','Coin'],['🕯️','Candle'],
+    ['🔑','Key'],['⌚','Watch'],['📎','Paper clip'],['✏️','Pencil'],['💰','Money bag'],['🕯️','Candle'],
     ['🧭','Compass'],['🔦','Torch'],['🧵','Thread'],['🧷','Safety pin'],['✂️','Scissors'],['📏','Ruler'],
     ['🔋','Battery'],['💡','Light bulb'],['🔍','Magnifier'],['📌','Pin'],['🖊️','Pen'],['🎲','Die'],
     ['🧩','Puzzle piece'],['🪀','Yo-yo'],['🎈','Balloon'],['🧸','Teddy bear'],['🪁','Kite'],['🍎','Apple'],
     ['🍋','Lemon'],['🥕','Carrot'],['🍌','Banana'],['🧀','Cheese'],['🥚','Egg'],['🍄','Mushroom'],
-    ['🌰','Chestnut'],['🐚','Shell'],['🪶','Feather'],['🍂','Leaf'],['🌸','Flower'],['🪨','Stone'],
+    ['🌰','Chestnut'],['🐚','Shell'],['🌻','Sunflower'],['🍂','Leaf'],['🌸','Flower'],['🧱','Brick'],
     ['🥄','Spoon'],['🍴','Fork'],['☕','Cup'],['🔔','Bell'],['✉️','Envelope'],['📚','Books'],
-    ['🧲','Magnet'],['🪥','Toothbrush'],['🧼','Soap'],['🧽','Sponge'],['👓','Glasses'],['🧤','Gloves'],
+    ['🧲','Magnet'],['🧹','Broom'],['🧼','Soap'],['🧽','Sponge'],['👓','Glasses'],['🧤','Gloves'],
     ['🧦','Socks'],['🎩','Top hat'],['🧣','Scarf'],['💍','Ring'],['🎀','Ribbon'],['⚽','Football'],
     ['🏀','Basketball'],['🎾','Tennis ball'],['🎯','Dart board'],['⏰','Alarm clock'],['📷','Camera'],['📱','Phone'],
-    ['🎧','Headphones'],['🪜','Ladder'],['🔨','Hammer'],['🪛','Screwdriver'],['🔧','Spanner'],['🧰','Toolbox'],
-    ['🪣','Bucket'],['🌂','Umbrella'],['🎸','Guitar'],['🥁','Drum'],['🎺','Trumpet'],['🚲','Bicycle'],
+    ['🎧','Headphones'],['🧺','Basket'],['🔨','Hammer'],['🧯','Extinguisher'],['🔧','Spanner'],['🧰','Toolbox'],
+    ['🍕','Pizza'],['🌂','Umbrella'],['🎸','Guitar'],['🥁','Drum'],['🎺','Trumpet'],['🚲','Bicycle'],
     ['⚓','Anchor'],['🏆','Trophy'],['🎁','Gift'],['🧁','Cupcake'],['🍩','Doughnut'],['🐢','Tortoise'],
-    ['🦋','Butterfly'],['🐝','Bee'],['🌵','Cactus'],['🌙','Moon'],['☂️','Parasol'],['🪴','Pot plant'],
+    ['🦋','Butterfly'],['🐝','Bee'],['🌵','Cactus'],['🧮','Abacus'],['☂️','Parasol'],['🐙','Octopus'],
   ];
 
+  // colour-blind-safe palette (Okabe–Ito): the six colours stay distinct with red-green colour blindness
   const COLOURS = [
-    ['Red', '#d64541'], ['Orange', '#e67e22'], ['Yellow', '#f1c40f'],
-    ['Green', '#27ae60'], ['Blue', '#2e86de'], ['Purple', '#8e44ad'],
+    ['Red', '#d55e00'], ['Orange', '#e69f00'], ['Yellow', '#f0e442'],
+    ['Green', '#009e73'], ['Blue', '#0072b2'], ['Pink', '#cc79a7'],
   ];
   // SVG bodies drawn in a 100×100 box; {c} is replaced with the fill colour
   const SHAPES = {
@@ -153,10 +154,8 @@
     for (const field of ['rows', 'cols']) $('c-' + field).value = custom[field];
     document.querySelectorAll('#customField .step').forEach(b => {
       const v = custom[b.dataset.for.slice(2)];
-      const off = +b.dataset.step < 0 ? v <= DIM_RANGE[0] : v >= DIM_RANGE[1];
-      // a focused button that becomes disabled would drop focus to <body>; hand it to the opposite button
-      if (off && document.activeElement === b) b.parentElement.querySelector(`.step[data-step="${-b.dataset.step}"]`).focus();
-      b.disabled = off;
+      // aria-disabled rather than disabled, so a button that reaches its limit keeps keyboard focus
+      b.setAttribute('aria-disabled', String(+b.dataset.step < 0 ? v <= DIM_RANGE[0] : v >= DIM_RANGE[1]));
     });
   }
 
@@ -172,9 +171,10 @@
     let ok = true;
     if (!cats.length) { hint.textContent = 'Choose at least one kind of object.'; ok = false; }
     else if (available < pairs) {
-      hint.textContent = `Not enough different objects for ${plural(pairs, 'pair')}: the kinds you chose have ${available}. Add another kind of object or choose a smaller board.`;
+      hint.textContent = `Not enough different objects for ${plural(pairs, 'pair')}: ${cats.length === 1 ? 'the kind you chose has' : 'the kinds you chose have'} ${available}. Add another kind of object or choose a smaller board.`;
       ok = false;
-    } else hint.textContent = `${available} different objects to deal from. Each round deals new ones.`;
+    } else hint.textContent = `${available} different objects to deal from.` +
+      (available >= 2 * pairs ? " Each round avoids the last round's objects." : ' Some will repeat from round to round.');
     hint.classList.toggle('warn', !ok);
     $('startBtn').disabled = !ok;
 
@@ -198,6 +198,9 @@
   let recent = new Set();   // objects dealt last round, avoided in the next one where possible
   const history = [];       // rounds played this visit
   let clockRaf = 0;
+  const MIN_CS = 22, MAX_CS = 132;   // card size limits in CSS px
+
+  const announce = text => { $('announcer').textContent = ''; requestAnimationFrame(() => { $('announcer').textContent = text; }); };
 
   function deal() {
     const [rows, cols] = boardDims(), cats = checkedCats();
@@ -212,13 +215,15 @@
     }
     recent = new Set(chosen.map(i => i.key));
 
+    if (game) { clearTimeout(game.resultsTimer); game.cards.forEach(c => clearTimeout(c.hideT)); }
     clearPending();
     stopClock();
+    const keepFocus = sections.play.contains(document.activeElement) && !sections.play.hidden; // e.g. New deal
     game = {
       rows, cols, pairs, found: 0, moves: 0, misses: 0,
       cards: [], first: null, pending: null,
       started: false, running: false, paused: false, done: false,
-      elapsed: 0, t0: 0,
+      elapsed: 0, t0: 0, dispCols: null, resultsTimer: 0, lastFocus: null,
     };
 
     const deck = shuffle([...chosen, ...chosen]);
@@ -239,13 +244,14 @@
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'mcard';
-      el.innerHTML = `<span class="inner" aria-hidden="true"><span class="side back"></span><span class="side face">${it.html}</span></span>`;
-      const card = { idx: game.cards.length, key: it.key, name: it.name, el, up: false, matched: false, pos: i };
+      el.tabIndex = game.cards.length === 0 ? 0 : -1; // one tab stop for the board; arrow keys move inside it
+      // the face is filled in only while the card is face up, so it can't be read, printed or copied before then
+      el.innerHTML = '<span class="inner" aria-hidden="true"><span class="side back"></span><span class="side face"></span></span>';
+      const card = { key: it.key, name: it.name, html: it.html, el, face: el.querySelector('.face'), up: false, matched: false, pos: i, hideT: 0 };
       el.addEventListener('click', () => onCard(card));
       game.cards.push(card);
       board.appendChild(el);
     }
-    game.cards.forEach(labelCard);
 
     $('hudTotal').textContent = pairs;
     $('pausedCover').hidden = true;
@@ -254,11 +260,14 @@
     updateHud();
     show('play');
     layout();
+    game.cards.forEach(labelCard);
     $('hudTime').textContent = fmt(0);
+    if (!keepFocus) game.cards[0].el.focus({ preventScroll: true });
   }
 
   function labelCard(c) {
-    const where = `Row ${Math.floor(c.pos / game.cols) + 1}, column ${c.pos % game.cols + 1}`;
+    const dc = game.dispCols || game.cols;
+    const where = `Row ${Math.floor(c.pos / dc) + 1}, column ${c.pos % dc + 1}`;
     c.el.setAttribute('aria-label', c.matched ? `${c.name}, matched` : c.up ? `${where}: ${c.name}` : `${where}: face down`);
     c.el.setAttribute('aria-disabled', String(c.matched));
   }
@@ -274,18 +283,34 @@
     $('hudMoves').textContent = game.moves;
   }
 
+  function showFace(c) {
+    clearTimeout(c.hideT);
+    if (!c.face.firstChild) c.face.innerHTML = c.html;
+  }
+  // empties the face once the card has finished turning back over
+  function hideFaceLater(c) {
+    clearTimeout(c.hideT);
+    c.hideT = setTimeout(() => { if (!c.up && !c.matched) c.face.replaceChildren(); }, 360);
+  }
+
+  function setTabStop(el) {
+    for (const c of game.cards) c.el.tabIndex = c.el === el ? 0 : -1;
+  }
+
   function onCard(c) {
     if (!game || game.done || game.paused || c.matched) return;
+    setTabStop(c.el);
     // tapping on while two non-matching cards are still showing turns them back at once
     if (game.pending) clearPending();
     if (c.up) return;
     if (!game.started) startClock();
 
     c.up = true;
+    showFace(c);
     c.el.classList.add('up');
     labelCard(c);
 
-    if (!game.first) { game.first = c; return; }
+    if (!game.first) { game.first = c; setStatus(c.name); return; }
     const a = game.first;
     game.first = null;
     game.moves++;
@@ -302,7 +327,7 @@
       game.misses++;
       a.el.classList.add('miss');
       c.el.classList.add('miss');
-      setStatus('Not a match.', 'bad');
+      setStatus(`Not a match: ${a.name} and ${c.name}.`, 'bad');
       game.pending = { cards: [a, c], timer: setTimeout(clearPending, MISMATCH_MS) };
     }
     updateHud();
@@ -316,6 +341,7 @@
       x.up = false;
       x.el.classList.remove('up', 'miss');
       labelCard(x);
+      hideFaceLater(x);
     }
     game.pending = null;
   }
@@ -342,13 +368,15 @@
 
   function pause() {
     if (!game || game.done || game.paused) return;
+    game.lastFocus = sections.play.contains(document.activeElement) ? document.activeElement : null;
     clearPending();
     stopClock();
     game.paused = true;
     $('board').classList.add('paused-hide');
     $('pausedCover').hidden = false;
     $('pauseBtn').textContent = 'Resume';
-    $('resumeBtn').focus();
+    $('resumeBtn').focus({ preventScroll: true });
+    announce('Paused. The cards are hidden.');
   }
   function resume() {
     if (!game || !game.paused) return;
@@ -358,34 +386,51 @@
     $('pauseBtn').textContent = 'Pause';
     if (game.started) { game.running = true; game.t0 = now(); tick(); }
     $('hudTime').textContent = fmt(elapsed());
+    const f = game.lastFocus;
+    const back = f && f.isConnected && !$('pausedCover').contains(f) ? f : (game.cards.find(c => c.el.tabIndex === 0) || game.cards[0]).el;
+    back.focus({ preventScroll: true });
+    announce('Resumed.');
   }
   // a timed game can't keep running while the player is in another app or tab
   document.addEventListener('visibilitychange', () => { if (document.hidden && game && game.started) pause(); });
 
   /* ───────────── Board layout ─────────────
-     Cards are sized so the whole board fits on screen without scrolling. A rectangular board
-     is turned to match the screen if that gives bigger cards. */
+     Cards are sized so the whole board fits on screen without scrolling. Before the first tap a
+     rectangular board is turned to match the screen if that gives bigger cards; once play has
+     started the orientation is kept, so turning the device only resizes the cards and every card
+     stays where the player saw it. */
+
+  const sideLayout = window.matchMedia('(max-height: 500px) and (orientation: landscape)');
+  const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]) || 0;
 
   function layout() {
     if (!game || sections.play.hidden) return;
-    const board = $('board'), wrap = $('boardWrap');
-    const viewH = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const vv = window.visualViewport;
+    if (vv && vv.scale > 1.01) return; // the player is pinch-zooming: keep the cards as they are
+    const board = $('board'), wrap = $('boardWrap'), panel = sections.play, actions = $('playActions');
+    const viewH = vv ? vv.height : window.innerHeight;
     const W = wrap.clientWidth;
     const top = wrap.getBoundingClientRect().top + window.scrollY;
-    const below = $('playActions').offsetHeight + 12 + 18; // action buttons, their margin, page padding
-    const H = Math.max(160, viewH - top - below);
-    const gap = parseFloat(getComputedStyle(board).getPropertyValue('--gap')) || 8;
-    const fit = (cols, rows) => Math.floor(Math.min((W - gap * (cols - 1)) / cols, (H - gap * (rows - 1)) / rows));
+    const tail = px(panel, 'paddingBottom') + px(panel, 'borderBottomWidth') + px(document.querySelector('.wrap'), 'paddingBottom');
+    // on a short landscape screen the buttons sit beside the board, not below it
+    const below = sideLayout.matches ? tail : actions.offsetHeight + px(actions, 'marginTop') + tail;
+    const H = Math.max(120, viewH - top - below - 1);
+    const gap = px(board, 'columnGap') || 8;
+    const fit = (cols, rows) => Math.max(MIN_CS, Math.min(MAX_CS,
+      Math.floor(Math.min((W - gap * (cols - 1)) / cols, (H - gap * (rows - 1)) / rows))));
 
-    let cols = game.cols, rows = game.rows, cs = fit(cols, rows);
-    if (rows !== cols && fit(rows, cols) > cs) { [cols, rows] = [rows, cols]; cs = fit(cols, rows); }
-    cs = Math.max(26, Math.min(cs, 132));
-    game.dispCols = cols;
+    if (!game.started || !game.dispCols) {
+      const turn = game.rows !== game.cols && fit(game.rows, game.cols) > fit(game.cols, game.rows);
+      const dispCols = turn ? game.rows : game.cols;
+      if (dispCols !== game.dispCols) { game.dispCols = dispCols; game.cards.forEach(labelCard); }
+    }
+    const cols = game.dispCols, rows = cols === game.cols ? game.rows : game.cols;
     board.style.setProperty('--cols', cols);
-    board.style.setProperty('--cs', cs + 'px');
+    board.style.setProperty('--cs', fit(cols, rows) + 'px');
   }
   window.addEventListener('resize', layout);
   if (window.visualViewport) window.visualViewport.addEventListener('resize', layout);
+  sideLayout.addEventListener ? sideLayout.addEventListener('change', layout) : sideLayout.addListener(layout);
 
   // Arrow keys move between cards on the board.
   $('board').addEventListener('keydown', e => {
@@ -397,60 +442,73 @@
     if (i < 0) return;
     e.preventDefault();
     do { i += moves[e.key]; } while (cells[i] && !cells[i].matches('button'));
-    if (cells[i]) cells[i].focus();
+    if (cells[i]) { setTabStop(cells[i]); cells[i].focus(); }
+  });
+  // Esc pauses and resumes
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !game || game.done || sections.play.hidden) return;
+    game.paused ? resume() : pause();
   });
 
   /* ───────────── Finish ───────────── */
 
+  const tenths = ms => Math.floor(ms / 100) * 100; // times are shown, compared and saved to the tenth
+
   function finish() {
     stopClock();
     game.done = true;
-    const time = game.elapsed;
+    const time = tenths(game.elapsed);
     $('hudTime').textContent = fmt(time);
     setStatus('All pairs found!', 'good');
 
     const key = bestKey(game.rows, game.cols);
     const prev = store.get(key) || {};
-    const newBestTime = !prev.time || time < prev.time;
+    const newBestTime = !prev.time || time < tenths(prev.time);
     const newBestMoves = !prev.moves || game.moves < prev.moves;
     store.set(key, { time: newBestTime ? time : prev.time, moves: newBestMoves ? game.moves : prev.moves });
 
     const acc = Math.round(100 * game.pairs / game.moves);
     history.push({ size: sizeLabel(game.rows, game.cols), time, moves: game.moves, acc, best: newBestTime });
 
-    setTimeout(() => showResults({ time, newBestTime, newBestMoves, prev, acc }), 750);
+    const g = game;
+    const round = { rows: g.rows, cols: g.cols, moves: g.moves, misses: g.misses, pairs: g.pairs, time, newBestTime, newBestMoves, prev, acc };
+    // a short pause to see the last pair; cancelled if the player deals again or quits first
+    g.resultsTimer = setTimeout(() => { if (game === g) showResults(round); }, 750);
   }
 
-  function showResults({ time, newBestTime, newBestMoves, prev, acc }) {
-    const size = sizeLabel(game.rows, game.cols);
+  function showResults(r) {
+    const size = sizeLabel(r.rows, r.cols);
     $('resultTitle').textContent = 'Table cleared!';
-    $('finalTime').textContent = fmt(time);
+    $('finalTime').textContent = fmt(r.time);
     const msg = $('finalMsg');
-    if (newBestTime && prev.time) { msg.textContent = `New best time on ${size}! Your previous best was ${fmt(prev.time)}.`; msg.className = 'best'; }
-    else if (newBestTime) { msg.textContent = `Your first time on ${size}. Play again to beat it.`; msg.className = ''; }
-    else { msg.textContent = `Your best on ${size} is ${fmt(prev.time)}.`; msg.className = ''; }
+    if (r.newBestTime && r.prev.time) { msg.textContent = `New best time on ${size}! Your previous best was ${fmt(r.prev.time)}.`; msg.className = 'best'; }
+    else if (r.newBestTime) { msg.textContent = `Your first time on ${size}. Play again to beat it.`; msg.className = ''; }
+    else { msg.textContent = `Your best on ${size} is ${fmt(r.prev.time)}.`; msg.className = ''; }
 
     $('finalStats').innerHTML = [
-      ['Moves', game.moves + (newBestMoves && prev.moves ? ' ★' : '')],
-      ['Misses', game.misses],
-      ['Accuracy', acc + '%'],
-      ['Pairs', game.pairs],
+      ['Moves', r.moves + (r.newBestMoves && r.prev.moves ? ' ★' : '')],
+      ['Misses', r.misses],
+      ['Accuracy', r.acc + '%'],
+      ['Pairs', r.pairs],
     ].map(([k, v]) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
 
     $('roundsTable').innerHTML = `
       <thead><tr><th>Round</th><th>Board</th><th>Time</th><th>Moves</th><th>Accuracy</th></tr></thead>
-      <tbody>${history.map((r, i) => `<tr class="${i === history.length - 1 ? 'latest' : ''}"><td>${i + 1}</td><td>${r.size}</td><td class="${r.best ? 'best' : ''}">${fmt(r.time)}${r.best ? ' ★' : ''}</td><td>${r.moves}</td><td>${r.acc}%</td></tr>`).join('')}</tbody>`;
+      <tbody>${history.map((h, i) => `<tr class="${i === history.length - 1 ? 'latest' : ''}"><td>${i + 1}</td><td>${h.size}</td><td class="${h.best ? 'best' : ''}">${fmt(h.time)}${h.best ? ' ★' : ''}</td><td>${h.moves}</td><td>${h.acc}%</td></tr>`).join('')}</tbody>`;
     show('results');
     updateSetup();
-    $('againBtn').focus();
+    $('resultTitle').focus({ preventScroll: true });
+    announce(`Table cleared in ${fmt(r.time)} with ${plural(r.moves, 'move')}. ${msg.textContent}`);
   }
 
   function quit() {
+    if (game) clearTimeout(game.resultsTimer);
     clearPending();
     stopClock();
     game = null;
     show('setup');
     updateSetup();
+    $('startBtn').focus({ preventScroll: true });
   }
 
   $('startBtn').addEventListener('click', deal);
@@ -459,7 +517,7 @@
   $('restartBtn').addEventListener('click', deal);
   $('quitBtn').addEventListener('click', quit);
   $('againBtn').addEventListener('click', deal);
-  $('setupBtn').addEventListener('click', () => { show('setup'); updateSetup(); });
+  $('setupBtn').addEventListener('click', () => { show('setup'); updateSetup(); $('startBtn').focus({ preventScroll: true }); });
 
   // exposed for automated tests only
   window.__match = { CATALOGUE, get game() { return game; } };
