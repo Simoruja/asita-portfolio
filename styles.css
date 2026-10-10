@@ -83,11 +83,11 @@ fieldset { border: 0; min-width: 0; }
   font: inherit; font-size: 22px; line-height: 1; width: 48px; height: 46px;
   border: 0; background: transparent; color: var(--navy); cursor: pointer;
 }
-.stepper-ctl .step:disabled { opacity: .3; cursor: not-allowed; }
+.stepper-ctl .step[aria-disabled="true"] { opacity: .3; cursor: not-allowed; }
 .stepper-ctl .step:first-child { border-radius: 999px 0 0 999px; }
 .stepper-ctl .step:last-child { border-radius: 0 999px 999px 0; }
 .stepper-ctl .step:focus-visible, .stepper-ctl input:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
-@media (hover: hover) { .stepper-ctl .step:not(:disabled):hover { background: var(--sel-bg); } }
+@media (hover: hover) { .stepper-ctl .step:not([aria-disabled="true"]):hover { background: var(--sel-bg); } }
 .stepper-ctl input {
   /* 16px stops iOS Safari zooming in when the field is focused */
   font: inherit; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;

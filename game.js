@@ -245,10 +245,9 @@
       const field = b.dataset.for.slice(2), [lo, hi] = customRange(field, mode), v = values[field];
       // in missing mode "objects to guess" can't reach the tray size, and the tray can't exceed 30
       const top = field === 'guess' && mode === 'missing' ? Math.min(hi, CUSTOM_RANGE.shown[1] - 1) : hi;
-      const off = +b.dataset.step < 0 ? v <= lo : v >= top;
-      // a focused button that becomes disabled would drop focus to <body>; hand it to the opposite button
-      if (off && document.activeElement === b) b.parentElement.querySelector(`.step[data-step="${-b.dataset.step}"]`).focus();
-      b.disabled = off;
+      // aria-disabled rather than disabled, so a button that reaches its limit keeps keyboard focus;
+      // a press there does nothing because setCustom clamps the value
+      b.setAttribute('aria-disabled', String(+b.dataset.step < 0 ? v <= lo : v >= top));
     });
   }
 
