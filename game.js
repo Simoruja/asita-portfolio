@@ -40,11 +40,11 @@
   const RANKS = [['A','Ace'],['2','2'],['3','3'],['4','4'],['5','5'],['6','6'],['7','7'],['8','8'],['9','9'],['10','10'],['J','Jack'],['Q','Queen'],['K','King']];
 
   const CATEGORIES = [
-    { id: 'emoji',  label: 'Pictures', icon: '🍎' },
-    { id: 'shape',  label: 'Shapes',   icon: '🔷' },
-    { id: 'number', label: 'Numbers',  icon: '🔢' },
-    { id: 'letter', label: 'Letters',  icon: '🔤' },
-    { id: 'card',   label: 'Cards',    icon: '🂡' },
+    { id: 'emoji',  label: 'Pictures', icon: 'apple' },
+    { id: 'shape',  label: 'Shapes',   icon: 'shapes' },
+    { id: 'number', label: 'Numbers',  icon: 'number' },
+    { id: 'letter', label: 'Letters',  icon: 'letter' },
+    { id: 'card',   label: 'Cards',    icon: 'cards' },
   ];
 
   const CATALOGUE = [];
@@ -167,7 +167,7 @@
   const catSeg = $('catSeg');
   CATEGORIES.forEach(c => {
     catSeg.insertAdjacentHTML('beforeend',
-      `<input type="checkbox" name="cat" id="cat-${c.id}" value="${c.id}" checked><label for="cat-${c.id}"><span aria-hidden="true">${c.icon}</span>${c.label}</label>`);
+      `<input type="checkbox" name="cat" id="cat-${c.id}" value="${c.id}" checked><label for="cat-${c.id}">${window.icon3d ? icon3d(c.icon) : ''}${c.label}</label>`);
   });
 
   const saved = store.get('kims-settings');
