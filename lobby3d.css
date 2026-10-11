@@ -1,0 +1,76 @@
+/* Lobby screen: option tiles with 3D icons, and the base for the 3D scene at the top.
+   Shared by Asita's Game and Asita's Match; each game styles its own scene in styles.css. */
+
+.ico3d { display: block; width: 48px; height: 48px; overflow: visible; }
+
+/* ── Option tiles ── */
+.seg.tiles {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 100px), 1fr));
+}
+.seg.tiles.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.seg.tiles label {
+  position: relative;
+  flex-direction: column; justify-content: center; gap: 4px;
+  min-height: 108px; padding: 12px 6px 10px; border-radius: 16px;
+  text-align: center; line-height: 1.2; font-weight: 500;
+  background: var(--card); border: 1.5px solid var(--border);
+  box-shadow: 0 1px 0 rgba(0,0,0,.04);
+  perspective: 300px;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+.seg.tiles label small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.seg.tiles label .ico3d {
+  width: 52px; height: 52px; margin-bottom: 2px;
+  transition: transform .55s cubic-bezier(.2, .9, .25, 1.25), filter .2s ease, opacity .2s ease;
+}
+.seg.tiles input:checked + label {
+  background: var(--sel-bg); color: var(--text); border-color: var(--gold);
+  box-shadow: 0 10px 22px -12px rgba(28,34,51,.55), inset 0 0 0 1px var(--gold);
+  transform: translateY(-2px);
+}
+/* a quick 3D turn when a tile is chosen */
+.seg.tiles input:checked + label .ico3d { transform: rotateY(360deg) scale(1.06); }
+.seg.tiles input:checked + label::after {
+  content: '✓'; position: absolute; top: 7px; right: 9px;
+  width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; background: var(--gold); color: var(--card);
+}
+/* object kinds that are switched off look switched off */
+.seg.tiles input[type="checkbox"]:not(:checked) + label .ico3d { filter: grayscale(.85); opacity: .55; }
+.seg.tiles input[type="checkbox"]:not(:checked) + label { color: var(--muted); }
+@media (hover: hover) {
+  .seg.tiles label:hover { border-color: var(--gold); transform: translateY(-2px); }
+  .seg.tiles input:not(:checked) + label:hover .ico3d { transform: translateY(-3px) rotateY(-18deg) rotateX(8deg); }
+}
+.seg.tiles input:focus-visible + label { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+@media (max-width: 520px) {
+  .seg.tiles { gap: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 92px), 1fr)); }
+  .seg.tiles label { min-height: 96px; padding: 10px 4px 8px; font-size: 14px; }
+  .seg.tiles label .ico3d { width: 44px; height: 44px; }
+}
+
+/* ── 3D scene ── */
+.hero3d {
+  position: relative; height: clamp(150px, 34vw, 240px); margin: 0 0 10px;
+  perspective: 900px; perspective-origin: 50% 25%;
+  overflow: hidden; border-radius: 14px;
+  background: radial-gradient(120% 90% at 50% 0%, var(--hero-glow, rgba(196,144,48,.16)), transparent 70%);
+}
+.hero3d .scene {
+  position: absolute; inset: 0; transform-style: preserve-3d;
+  transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform .35s ease-out;
+}
+.hero3d .sway { position: absolute; inset: 0; transform-style: preserve-3d; animation: hero-sway 14s ease-in-out infinite; }
+@keyframes hero-sway { 0%, 100% { transform: rotateY(-6deg); } 50% { transform: rotateY(6deg); } }
+@keyframes hero-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9%); } }
+@keyframes hero-shadow { 0%, 100% { opacity: 1; scale: 1; } 50% { opacity: .55; scale: .8; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero3d .sway, .hero3d .sway * { animation: none !important; }
+  .hero3d .scene { transition: none; }
+  .seg.tiles label, .seg.tiles label .ico3d { transition: none; }
+  .seg.tiles input:checked + label .ico3d { transform: none; }
+}
